@@ -12,8 +12,12 @@ final class PowerModel: ObservableObject {
     @Published var temperatureC: Double?
     @Published var timeText: String = "…"
     @Published var healthPct: Int?
+    @Published var processes: [ProcessRow] = []
 
     var onUpdate: (() -> Void)?
+
+    /// Sample window for energy impact, in seconds.
+    static let energyDuration = 180
 
     private var timer: Timer?
     private var cachedHealthPct: Int?
@@ -113,5 +117,86 @@ final class PowerModel: ObservableObject {
         }
 
         fetchHealth()
+        fetchProcesses()
+    }
+
+    /// Energy impact per app, via the same private API Activity Monitor and BatFi use:
+    /// `systemstats_get_top_coalitions` in libsystemstats. "Coalitions" are the kernel's
+    /// own process grouping, so an app's helper processes (Chrome's renderers, etc.) are
+    /// already aggregated for us. No root required, unlike powermetrics.
+    private static let topCoalitions: ((Int, Int) -> Unmanaged<NSDictionary>)? = {
+        guard let handle = dlopen("/usr/lib/libsystemstats.dylib", RTLD_LAZY),
+              let sym = dlsym(handle, "systemstats_get_top_coalitions") else { return nil }
+        typealias Fn = @convention(c) (Int, Int) -> Unmanaged<NSDictionary>
+        return unsafeBitCast(sym, to: Fn.self)
+    }()
+
+    /// Turns a coalition bundle id into something readable: a real app name when the
+    /// bundle resolves, otherwise the daemon name looked up in ProcessCatalog.
+    static func label(forBundleID bundleID: String) -> (title: String, subtitle: String?, icon: NSImage) {
+        let genericIcon = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
+            ?? NSWorkspace.shared.icon(for: .unixExecutable)
+
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            let icon = NSWorkspace.shared.icon(forFile: url.path)
+            if let bundle = Bundle(url: url) {
+                let name = bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String
+                    ?? bundle.infoDictionary?["CFBundleDisplayName"] as? String
+                    ?? bundle.localizedInfoDictionary?[kCFBundleNameKey as String] as? String
+                    ?? bundle.infoDictionary?[kCFBundleNameKey as String] as? String
+                if let name { return (name, nil, icon) }
+            }
+            return (url.deletingPathExtension().lastPathComponent, nil, icon)
+        }
+
+        // Not an installed app — derive the daemon name from the bundle id
+        // ("com.apple.spotlightknowledged.updater" → "spotlightknowledged").
+        var derived = bundleID
+        if derived.hasPrefix("com.apple.") { derived.removeFirst("com.apple.".count) }
+        let daemon = derived.split(separator: ".").first.map(String.init) ?? derived
+
+        if let explanation = ProcessCatalog.description(for: daemon) {
+            return (explanation, daemon, genericIcon)
+        }
+        return (daemon, bundleID == daemon ? nil : bundleID, genericIcon)
+    }
+
+    func fetchProcesses() {
+        DispatchQueue.global(qos: .utility).async {
+            guard let fn = Self.topCoalitions,
+                  let dict = fn(Self.energyDuration, 10000).takeUnretainedValue() as? [String: Any],
+                  let bundleIDs = dict["bundle_identifiers"] as? [String],
+                  let impacts = dict["energy_impacts"] as? [Double],
+                  bundleIDs.count == impacts.count
+            else {
+                DispatchQueue.main.async { self.processes = [] }
+                return
+            }
+
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+            formatter.maximumFractionDigits = 0
+
+            var rows: [ProcessRow] = []
+            for (index, bundleID) in bundleIDs.enumerated() {
+                guard rows.count < 6 else { break }
+                // Impacts are totals over the sample window; normalize to a rate.
+                let impact = impacts[index] / Double(Self.energyDuration)
+                guard impact >= 1 else { break }
+                guard bundleID != "REDACTED" else { continue }
+
+                let info = Self.label(forBundleID: bundleID)
+                rows.append(ProcessRow(
+                    icon: info.icon,
+                    name: info.title,
+                    subtitle: info.subtitle,
+                    value: formatter.string(from: NSNumber(value: impact)) ?? "\(Int(impact))"
+                ))
+            }
+
+            DispatchQueue.main.async {
+                self.processes = rows
+            }
+        }
     }
 }
