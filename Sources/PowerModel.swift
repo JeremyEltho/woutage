@@ -14,6 +14,8 @@ final class PowerModel: ObservableObject {
     @Published var healthPct: Int?
 
     private var timer: Timer?
+    private var cachedHealthPct: Int?
+    private var lastHealthFetch: Date?
 
     func start() {
         refresh()
@@ -25,6 +27,12 @@ final class PowerModel: ObservableObject {
     /// Battery health as macOS itself reports it in System Information. The raw IOKit
     /// capacity keys do not agree with Apple's own figure, so read the source of truth.
     func fetchHealth() {
+        // system_profiler takes about a second, and battery health barely moves, so
+        // only pay for it every few minutes.
+        if let cached = cachedHealthPct, let last = lastHealthFetch, Date().timeIntervalSince(last) < 300 {
+            DispatchQueue.main.async { self.healthPct = cached }
+            return
+        }
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/usr/sbin/system_profiler"
@@ -48,7 +56,11 @@ final class PowerModel: ObservableObject {
                 }
             } catch {}
             DispatchQueue.main.async {
-                if let result { self.healthPct = result }
+                if let result {
+                    self.cachedHealthPct = result
+                    self.lastHealthFetch = Date()
+                    self.healthPct = result
+                }
             }
         }
     }
