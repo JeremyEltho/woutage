@@ -7,6 +7,7 @@ final class PowerModel: ObservableObject {
     @Published var level: Int = 0
     @Published var isCharging: Bool = false
     @Published var acConnected: Bool = false
+    @Published var watts: Double = 0
 
     private var timer: Timer?
 
@@ -34,11 +35,17 @@ final class PowerModel: ObservableObject {
             return ref.takeRetainedValue() as? T
         }
         let acConnected: Bool = regValue("ExternalConnected") ?? false
+        let voltageMV: Int = regValue("Voltage") ?? 0
+        let amperageMA: Int = regValue("Amperage") ?? 0
+        // Voltage x Amperage straight from the gas gauge. Verified against ioreg, and
+        // self-consistent whether charging or discharging.
+        let watts = abs(Double(voltageMV) * Double(amperageMA)) / 1_000_000.0
 
         DispatchQueue.main.async {
             self.level = level
             self.isCharging = isCharging
             self.acConnected = acConnected
+            self.watts = watts
         }
     }
 }
