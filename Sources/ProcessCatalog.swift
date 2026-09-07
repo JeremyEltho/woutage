@@ -159,6 +159,22 @@ enum ProcessCatalog {
         if let caseInsensitive = descriptions.first(where: { $0.key.lowercased() == lower }) {
             return caseInsensitive.value
         }
+        // Truncated name from top (e.g. "automationmode-w"): match dictionary keys it prefixes.
+        if lower.count >= 6, let prefixed = descriptions.first(where: { $0.key.lowercased().hasPrefix(lower) }) {
+            return prefixed.value
+        }
+        // Version-number-looking binaries ("2.1.263") are almost always bundled helpers.
+        if raw.range(of: #"^[\d.]+$"#, options: .regularExpression) != nil {
+            return "Background helper process"
+        }
+        // Reverse-DNS binaries are Apple/vendor background services.
+        if lower.hasPrefix("com.apple.") { return "Apple system service" }
+        if lower.hasPrefix("com.") { return "Background service" }
+        // Daemons conventionally end in "d" and are all-lowercase ("locationd"), unlike
+        // app names ("Discord"), so only treat the lowercase form as a daemon.
+        if raw == lower, lower.hasSuffix("d"), lower.count > 4, !lower.contains(" ") {
+            return "System background service"
+        }
         return nil
     }
 }
