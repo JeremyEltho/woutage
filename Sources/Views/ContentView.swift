@@ -25,6 +25,11 @@ struct ContentView: View {
 
             FaintDivider()
 
+            SectionHeader(title: "Last 12 hours")
+            ChargeHistoryChart(history: model.chargeHistory)
+
+            FaintDivider()
+
             SectionHeader(title: "Power distribution")
             PowerGraph(
                 batteryPower: model.batteryPower,

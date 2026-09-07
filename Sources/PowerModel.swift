@@ -18,6 +18,7 @@ final class PowerModel: ObservableObject {
     @Published var timeText: String = "…"
     @Published var healthPct: Int?
     @Published var processes: [ProcessRow] = []
+    @Published var chargeHistory = ChargeHistory()
 
     var onUpdate: (() -> Void)?
 
@@ -143,6 +144,7 @@ final class PowerModel: ObservableObject {
 
         fetchHealth()
         fetchProcesses()
+        fetchChargeHistory()
     }
 
     /// Energy impact per app, via the same private API Activity Monitor and BatFi use:
@@ -221,6 +223,15 @@ final class PowerModel: ObservableObject {
 
             DispatchQueue.main.async {
                 self.processes = rows
+            }
+        }
+    }
+
+    func fetchChargeHistory() {
+        DispatchQueue.global(qos: .utility).async {
+            let history = ChargeHistoryReader.history()
+            DispatchQueue.main.async {
+                self.chargeHistory = history
             }
         }
     }
