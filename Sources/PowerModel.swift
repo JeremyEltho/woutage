@@ -8,6 +8,11 @@ final class PowerModel: ObservableObject {
     @Published var isCharging: Bool = false
     @Published var acConnected: Bool = false
     @Published var watts: Double = 0
+    /// Signed: positive while discharging (the battery is a source of power),
+    /// negative while charging (the battery is a destination).
+    @Published var batteryPower: Float = 0
+    @Published var externalPower: Float = 0
+    @Published var systemPower: Float = 0
     @Published var cycleCount: Int?
     @Published var temperatureC: Double?
     @Published var timeText: String = "…"
@@ -101,6 +106,23 @@ final class PowerModel: ObservableObject {
         // Voltage x Amperage straight from the gas gauge. Verified against ioreg, and
         // self-consistent whether charging or discharging.
         let watts = abs(Double(voltageMV) * Double(amperageMA)) / 1_000_000.0
+        // The gas gauge reports negative amperage while discharging, which is the
+        // opposite of the convention used here, so flip it.
+        var batteryPower = Float(-(Double(voltageMV) * Double(amperageMA)) / 1_000_000.0)
+
+        // Power arriving from the charger. SystemPowerIn is in milliwatts, verified
+        // against SystemVoltageIn x SystemCurrentIn.
+        var externalPower: Float = 0
+        if acConnected, let telemetry: [String: AnyObject] = regValue("PowerTelemetryData"),
+           let systemPowerInMilliW = telemetry["SystemPowerIn"] as? Int, systemPowerInMilliW > 0 {
+            externalPower = Float(Double(systemPowerInMilliW) / 1_000.0)
+        }
+
+        if abs(batteryPower) < 0.01 { batteryPower = 0 }
+        if externalPower < 0.01 { externalPower = 0 }
+        // Whatever the battery and charger supply between them is what runs the laptop.
+        let systemPower = batteryPower + externalPower
+
         let cycleCount: Int? = regValue("CycleCount")
         let virtualTemp: Int? = regValue("VirtualTemperature")
         let temperatureC = virtualTemp.map { Double($0) / 100.0 }
@@ -110,6 +132,9 @@ final class PowerModel: ObservableObject {
             self.isCharging = isCharging
             self.acConnected = acConnected
             self.watts = watts
+            self.batteryPower = batteryPower
+            self.externalPower = externalPower
+            self.systemPower = systemPower
             self.cycleCount = cycleCount
             self.temperatureC = temperatureC
             self.timeText = Self.formatMinutes(isCharging ? timeToCharge : timeLeft)
