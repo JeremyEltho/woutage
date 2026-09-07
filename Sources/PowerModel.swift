@@ -8,6 +8,8 @@ final class PowerModel: ObservableObject {
     @Published var isCharging: Bool = false
     @Published var acConnected: Bool = false
     @Published var watts: Double = 0
+    @Published var cycleCount: Int?
+    @Published var temperatureC: Double?
 
     private var timer: Timer?
 
@@ -40,12 +42,17 @@ final class PowerModel: ObservableObject {
         // Voltage x Amperage straight from the gas gauge. Verified against ioreg, and
         // self-consistent whether charging or discharging.
         let watts = abs(Double(voltageMV) * Double(amperageMA)) / 1_000_000.0
+        let cycleCount: Int? = regValue("CycleCount")
+        let virtualTemp: Int? = regValue("VirtualTemperature")
+        let temperatureC = virtualTemp.map { Double($0) / 100.0 }
 
         DispatchQueue.main.async {
             self.level = level
             self.isCharging = isCharging
             self.acConnected = acConnected
             self.watts = watts
+            self.cycleCount = cycleCount
+            self.temperatureC = temperatureC
         }
     }
 }
