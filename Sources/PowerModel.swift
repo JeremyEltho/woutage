@@ -11,6 +11,7 @@ final class PowerModel: ObservableObject {
     @Published var cycleCount: Int?
     @Published var temperatureC: Double?
     @Published var timeText: String = "…"
+    @Published var healthPct: Int?
 
     private var timer: Timer?
 
@@ -18,6 +19,37 @@ final class PowerModel: ObservableObject {
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.refresh()
+        }
+    }
+
+    /// Battery health as macOS itself reports it in System Information. The raw IOKit
+    /// capacity keys do not agree with Apple's own figure, so read the source of truth.
+    func fetchHealth() {
+        DispatchQueue.global(qos: .utility).async {
+            let task = Process()
+            task.launchPath = "/usr/sbin/system_profiler"
+            task.arguments = ["SPPowerDataType"]
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = Pipe()
+            var result: Int? = nil
+            do {
+                try task.run()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                task.waitUntilExit()
+                if let output = String(data: data, encoding: .utf8) {
+                    for line in output.split(separator: "\n") {
+                        let trimmed = line.trimmingCharacters(in: .whitespaces)
+                        if trimmed.hasPrefix("Maximum Capacity:") {
+                            result = Int(trimmed.filter { $0.isNumber })
+                            break
+                        }
+                    }
+                }
+            } catch {}
+            DispatchQueue.main.async {
+                if let result { self.healthPct = result }
+            }
         }
     }
 
@@ -64,5 +96,7 @@ final class PowerModel: ObservableObject {
             self.temperatureC = temperatureC
             self.timeText = Self.formatMinutes(isCharging ? timeToCharge : timeLeft)
         }
+
+        fetchHealth()
     }
 }
