@@ -25,6 +25,40 @@ struct ContentView: View {
 
             FaintDivider()
 
+            SectionHeader(title: "Apps with High Energy Usage")
+            if model.processes.isEmpty {
+                Text("No apps using significant energy")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 13))
+            } else {
+                ForEach(model.processes) { proc in
+                    HStack(spacing: 8) {
+                        Image(nsImage: proc.icon)
+                            .resizable()
+                            .frame(width: 18, height: 18)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(proc.name)
+                                .foregroundColor(.primary)
+                                .font(.system(size: 13))
+                                .lineLimit(1)
+                            if let subtitle = proc.subtitle {
+                                Text(subtitle)
+                                    .foregroundColor(.secondary)
+                                    .font(.system(size: 10))
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                        Text(proc.value)
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 13))
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+
+            FaintDivider()
+
             Button(action: quitAction) {
                 HStack {
                     Text("Quit woutage")
