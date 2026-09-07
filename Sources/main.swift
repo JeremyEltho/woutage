@@ -21,6 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hosting = NSHostingController(rootView: ContentView(model: model, quitAction: { [weak self] in
             self?.quit()
         }))
+        // Without this the popover keeps a stale content size and clips the panel
+        // against the top of the screen.
+        hosting.sizingOptions = [.preferredContentSize]
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentViewController = hosting
