@@ -13,6 +13,8 @@ final class PowerModel: ObservableObject {
     @Published var timeText: String = "…"
     @Published var healthPct: Int?
 
+    var onUpdate: (() -> Void)?
+
     private var timer: Timer?
     private var cachedHealthPct: Int?
     private var lastHealthFetch: Date?
@@ -107,6 +109,7 @@ final class PowerModel: ObservableObject {
             self.cycleCount = cycleCount
             self.temperatureC = temperatureC
             self.timeText = Self.formatMinutes(isCharging ? timeToCharge : timeLeft)
+            self.onUpdate?()
         }
 
         fetchHealth()

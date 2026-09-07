@@ -28,6 +28,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.contentViewController = hosting
 
+        model.onUpdate = { [weak self] in
+            guard let self else { return }
+            let wattsStr = String(format: "%.1fW", self.model.watts)
+            self.statusItem.button?.title = "  \(self.model.level)% · \(wattsStr)"
+        }
         model.start()
     }
 
