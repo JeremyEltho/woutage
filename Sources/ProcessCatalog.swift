@@ -148,6 +148,11 @@ enum ProcessCatalog {
         "gopls": "Go language server",
         "rust-analyzer": "Rust language server",
         "tsserver": "TypeScript language server",
+        "WindowManager": "Stage Manager & window handling",
+        "cloudpaird": "Device pairing",
+        "wallpaperagent": "Desktop wallpaper",
+        "audioclocksyncd": "Audio clock sync",
+        "spotlightknowledged": "Spotlight suggestions",
     ]
 
     /// Resolves a raw process name to a friendly description. `top` truncates long
