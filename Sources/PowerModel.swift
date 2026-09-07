@@ -10,6 +10,7 @@ final class PowerModel: ObservableObject {
     @Published var watts: Double = 0
     @Published var cycleCount: Int?
     @Published var temperatureC: Double?
+    @Published var timeText: String = "…"
 
     private var timer: Timer?
 
@@ -18,6 +19,12 @@ final class PowerModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.refresh()
         }
+    }
+
+    static func formatMinutes(_ minutes: Int) -> String {
+        guard minutes > 0, minutes < 1440 else { return "Calculating…" }
+        let h = minutes / 60, m = minutes % 60
+        return h > 0 ? "\(h) hr, \(m) min" : "\(m) min"
     }
 
     func refresh() {
@@ -29,6 +36,8 @@ final class PowerModel: ObservableObject {
 
         let level = info[kIOPSCurrentCapacityKey] as? Int ?? 0
         let isCharging = info[kIOPSIsChargingKey] as? Bool ?? false
+        let timeLeft = info[kIOPSTimeToEmptyKey] as? Int ?? -1
+        let timeToCharge = info[kIOPSTimeToFullChargeKey] as? Int ?? -1
 
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         defer { IOObjectRelease(service) }
@@ -53,6 +62,7 @@ final class PowerModel: ObservableObject {
             self.watts = watts
             self.cycleCount = cycleCount
             self.temperatureC = temperatureC
+            self.timeText = Self.formatMinutes(isCharging ? timeToCharge : timeLeft)
         }
     }
 }
