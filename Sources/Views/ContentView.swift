@@ -25,6 +25,15 @@ struct ContentView: View {
 
             FaintDivider()
 
+            SectionHeader(title: "Power distribution")
+            PowerGraph(
+                batteryPower: model.batteryPower,
+                externalPower: model.externalPower,
+                systemPower: model.systemPower
+            )
+
+            FaintDivider()
+
             SectionHeader(title: "Apps with High Energy Usage")
             if model.processes.isEmpty {
                 Text("No apps using significant energy")
