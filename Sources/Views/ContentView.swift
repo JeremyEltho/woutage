@@ -90,6 +90,13 @@ struct ContentView: View {
         .padding(16)
         .frame(width: 280)
         .fixedSize(horizontal: false, vertical: true)
-        .background(.regularMaterial)
+        .background(.ultraThinMaterial)
+        .overlay(
+            // A faint edge highlight is what sells the "glass" look —
+            // without it, an ultra-thin material just reads as blurry.
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.white.opacity(0.15), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
