@@ -10,8 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil)
-            image?.isTemplate = true
+            let image = Self.loadMenuBarIcon()
             button.image = image
             button.title = "  …"
             button.action = #selector(togglePopover)
@@ -47,6 +46,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func quit() {
         NSApp.terminate(nil)
+    }
+
+    /// Loads the Claude sunburst icon bundled in Contents/Resources and scales
+    /// it to the status bar's icon height. Kept as a color image (not a
+    /// template) so the orange mark stays visible in both menu bar themes.
+    private static func loadMenuBarIcon() -> NSImage? {
+        guard let path = Bundle.main.path(forResource: "claude-icon", ofType: "svg"),
+              let image = NSImage(contentsOfFile: path) else {
+            return NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil)
+        }
+        let height: CGFloat = 18
+        let width = height * (image.size.width / image.size.height)
+        image.size = NSSize(width: width, height: height)
+        image.isTemplate = false
+        return image
     }
 }
 

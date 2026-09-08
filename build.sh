@@ -9,7 +9,7 @@ APP="$BUILD_DIR/$APP_NAME.app"
 DEST="${1:-/Applications}"
 
 rm -rf "$BUILD_DIR"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 echo "==> Compiling"
 swiftc "$ROOT"/Sources/*.swift "$ROOT"/Sources/Views/*.swift \
@@ -18,6 +18,7 @@ swiftc "$ROOT"/Sources/*.swift "$ROOT"/Sources/Views/*.swift \
     -O
 
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/Resources/claude-icon.svg" "$APP/Contents/Resources/claude-icon.svg"
 
 echo "==> Signing (ad-hoc)"
 codesign --force --sign - "$APP"
@@ -31,4 +32,4 @@ cp -R "$APP" "$DEST/$APP_NAME.app"
 
 echo "==> Launching"
 open "$DEST/$APP_NAME.app"
-echo "Done. Look for the bolt icon in your menu bar."
+echo "Done. Look for the Claude icon in your menu bar."
