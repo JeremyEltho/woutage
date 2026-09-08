@@ -8,13 +8,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var baseIcon: NSImage?
     private var animationTimer: Timer?
-    private var animationStart = Date()
 
     // Sprite frame is drawn into a canvas padded beyond the icon's own size so
-    // the walk/bounce offsets never clip against the button's edges.
+    // the random jump/wiggle offsets never clip against the button's edges.
     private let iconHeight: CGFloat = 24
-    private let bounceAmplitude: CGFloat = 2
-    private let walkAmplitude: CGFloat = 1.5
+    private let maxWalk: CGFloat = 3
+    private let maxBounce: CGFloat = 4
+
+    // Random-walk animation state: the sprite eases from (fromX, fromY) to
+    // (toX, toY) over a random duration, then idles for a random pause
+    // before picking a new target — so it never settles into a fixed loop.
+    private var offsetX: CGFloat = 0
+    private var offsetY: CGFloat = 0
+    private var fromX: CGFloat = 0
+    private var fromY: CGFloat = 0
+    private var toX: CGFloat = 0
+    private var toY: CGFloat = 0
+    private var phaseStart = Date()
+    private var phaseDuration: TimeInterval = 0
+    private var isMoving = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -72,28 +84,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return image
     }
 
-    /// Redraws the sprite each tick with a small horizontal wiggle and a
-    /// vertical bounce, so the icon reads as a tiny walking/bouncing
-    /// character without ever leaving its fixed slot in the menu bar.
+    /// Picks the sprite's next move: either a fresh random target position
+    /// (an "eased" hop over a short random duration) or a random idle pause
+    /// at its current spot, alternating so the movement never repeats on a
+    /// fixed cadence.
+    private func scheduleNextPhase() {
+        phaseStart = Date()
+        if isMoving {
+            isMoving = false
+            phaseDuration = Double.random(in: 0.15...1.4)
+        } else {
+            isMoving = true
+            fromX = offsetX
+            fromY = offsetY
+            toX = CGFloat.random(in: -maxWalk...maxWalk)
+            toY = CGFloat.random(in: 0...maxBounce)
+            phaseDuration = Double.random(in: 0.12...0.35)
+        }
+    }
+
+    /// Redraws the sprite each tick at its current random-walk offset, so it
+    /// reads as a tiny character idling, then hopping to an unpredictable
+    /// spot, without ever leaving its fixed slot in the menu bar.
     private func startIconAnimation() {
         guard let baseIcon else { return }
-        animationStart = Date()
+        scheduleNextPhase()
 
-        let canvasWidth = baseIcon.size.width + walkAmplitude * 2
-        let canvasHeight = baseIcon.size.height + bounceAmplitude
+        let canvasWidth = baseIcon.size.width + maxWalk * 2
+        let canvasHeight = baseIcon.size.height + maxBounce
         let canvasSize = NSSize(width: canvasWidth, height: canvasHeight)
 
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { [weak self] _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self, let button = self.statusItem.button else { return }
-            let t = Date().timeIntervalSince(self.animationStart)
-            let xOffset = self.walkAmplitude * CGFloat(sin(t * 4))
-            // Frequency doubled and rectified so the bounce always lifts
-            // upward, like a footstep, rather than drifting up and down.
-            let yOffset = self.bounceAmplitude * CGFloat(abs(sin(t * 4)))
+
+            var elapsed = Date().timeIntervalSince(self.phaseStart)
+            if elapsed >= self.phaseDuration {
+                self.scheduleNextPhase()
+                elapsed = 0
+            }
+
+            if self.isMoving {
+                let progress = min(elapsed / self.phaseDuration, 1)
+                let eased = progress * progress * (3 - 2 * progress) // smoothstep
+                self.offsetX = self.fromX + (self.toX - self.fromX) * CGFloat(eased)
+                self.offsetY = self.fromY + (self.toY - self.fromY) * CGFloat(eased)
+            }
 
             let frame = NSImage(size: canvasSize)
             frame.lockFocus()
-            baseIcon.draw(at: NSPoint(x: self.walkAmplitude + xOffset, y: yOffset),
+            baseIcon.draw(at: NSPoint(x: self.maxWalk + self.offsetX, y: self.offsetY),
                           from: .zero, operation: .sourceOver, fraction: 1)
             frame.unlockFocus()
             frame.isTemplate = false
