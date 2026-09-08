@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Sprite frame is drawn into a canvas padded beyond the icon's own size so
     // the walk/bounce offsets never clip against the button's edges.
-    private let iconHeight: CGFloat = 22
+    private let iconHeight: CGFloat = 24
     private let bounceAmplitude: CGFloat = 2
     private let walkAmplitude: CGFloat = 1.5
 
