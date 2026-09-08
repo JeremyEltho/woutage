@@ -73,30 +73,52 @@ struct ContentView: View {
 
             FaintDivider()
 
-            Button(action: quitAction) {
-                HStack {
-                    Text("Quit woutage")
-                        .foregroundColor(.primary)
-                        .font(.system(size: 13))
-                    Spacer()
-                    Text("⌘Q")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 13))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+            quitButton
         }
         .padding(16)
         .frame(width: 280)
         .fixedSize(horizontal: false, vertical: true)
-        .background(.ultraThinMaterial)
-        .overlay(
-            // A faint edge highlight is what sells the "glass" look —
-            // without it, an ultra-thin material just reads as blurry.
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(.white.opacity(0.15), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .modifier(PanelGlassBackground())
+    }
+
+    @ViewBuilder
+    private var quitButton: some View {
+        let label = HStack {
+            Text("Quit woutage")
+                .foregroundColor(.primary)
+                .font(.system(size: 13))
+            Spacer()
+            Text("⌘Q")
+                .foregroundColor(.secondary)
+                .font(.system(size: 13))
+        }
+        .contentShape(Rectangle())
+
+        if #available(macOS 26, *) {
+            Button(action: quitAction) { label }
+                .buttonStyle(.glass)
+        } else {
+            Button(action: quitAction) { label }
+                .buttonStyle(.plain)
+        }
+    }
+}
+
+/// The popover's frosted panel. On macOS 26+ this uses the real Liquid Glass
+/// material (`glassEffect`); on older systems it falls back to
+/// `.ultraThinMaterial` with a hand-drawn edge highlight to approximate it.
+private struct PanelGlassBackground: ViewModifier {
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 14, style: .continuous) }
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .glassEffect(.regular, in: shape)
+        } else {
+            content
+                .background(.ultraThinMaterial)
+                .overlay(shape.strokeBorder(.white.opacity(0.15), lineWidth: 1))
+                .clipShape(shape)
+        }
     }
 }
