@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = PowerModel()
     let keepAwake = KeepAwake()
     let alerts = BatteryAlerts()
+    let launchAtLogin = LaunchAtLogin()
     var popover: NSPopover!
 
     private var baseIcon: NSImage?
@@ -47,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         startIconAnimation()
 
-        let hosting = NSHostingController(rootView: ContentView(model: model, keepAwake: keepAwake, alerts: alerts, quitAction: { [weak self] in
+        let hosting = NSHostingController(rootView: ContentView(model: model, keepAwake: keepAwake, alerts: alerts, launchAtLogin: launchAtLogin, quitAction: { [weak self] in
             self?.quit()
         }))
         // Without this the popover keeps a stale content size and clips the panel
@@ -78,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            launchAtLogin.refresh()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }

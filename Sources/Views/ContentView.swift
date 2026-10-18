@@ -4,6 +4,7 @@ struct ContentView: View {
     @ObservedObject var model: PowerModel
     @ObservedObject var keepAwake: KeepAwake
     @ObservedObject var alerts: BatteryAlerts
+    @ObservedObject var launchAtLogin: LaunchAtLogin
     let quitAction: () -> Void
 
     var body: some View {
@@ -88,6 +89,21 @@ struct ContentView: View {
                     }
                 }
                 .padding(.top, 4)
+            }
+
+            FaintDivider()
+
+            Toggle(isOn: Binding(get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) })) {
+                Text("Launch at login")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 13))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            if let error = launchAtLogin.errorText {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.red)
             }
 
             FaintDivider()
