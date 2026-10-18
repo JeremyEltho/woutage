@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: PowerModel
+    @ObservedObject var keepAwake: KeepAwake
     @ObservedObject var alerts: BatteryAlerts
     let quitAction: () -> Void
 
@@ -63,6 +64,11 @@ struct ContentView: View {
                     AppEnergyRow(proc: proc)
                 }
             }
+
+            FaintDivider()
+
+            SectionHeader(title: "Keep Awake")
+            KeepAwakeRow(keepAwake: keepAwake)
 
             FaintDivider()
 
@@ -228,6 +234,34 @@ private struct AppEnergyRow: View {
               let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
         else { return }
         app.activate()
+    }
+}
+
+/// Off plus one chip per duration; the active chip shows the time remaining.
+private struct KeepAwakeRow: View {
+    @ObservedObject var keepAwake: KeepAwake
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Chip(title: "Off", isOn: !keepAwake.isActive) { keepAwake.stop() }
+                ForEach(KeepAwake.choices) { choice in
+                    Chip(title: choice.label, isOn: keepAwake.selected == choice) { keepAwake.start(choice) }
+                }
+            }
+            if keepAwake.isActive {
+                HStack(spacing: 4) {
+                    Image(systemName: "cup.and.saucer.fill")
+                    if let endsAt = keepAwake.endsAt {
+                        Text("Awake until \(endsAt, format: .dateTime.hour().minute())")
+                    } else {
+                        Text("Awake until you turn it off")
+                    }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.orange)
+            }
+        }
     }
 }
 
