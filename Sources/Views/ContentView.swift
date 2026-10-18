@@ -15,6 +15,11 @@ struct ContentView: View {
 
             FaintDivider()
 
+            SectionHeader(title: "Live power draw")
+            PowerSparkline(samples: model.powerSamples)
+
+            FaintDivider()
+
             if let temp = model.temperatureC {
                 InfoRow(label: "Temperature", value: String(format: "%.1f°C", temp))
             }

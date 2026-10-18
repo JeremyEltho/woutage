@@ -19,6 +19,11 @@ final class PowerModel: ObservableObject {
     @Published var healthPct: Int?
     @Published var processes: [ProcessRow] = []
     @Published var chargeHistory = ChargeHistory()
+    /// Rolling samples of what the whole machine draws, newest last.
+    @Published var powerSamples: [PowerSample] = []
+
+    /// 5s refresh x 60 = the last five minutes.
+    static let maxPowerSamples = 60
 
     var onUpdate: (() -> Void)?
 
@@ -139,6 +144,10 @@ final class PowerModel: ObservableObject {
             self.cycleCount = cycleCount
             self.temperatureC = temperatureC
             self.timeText = Self.formatMinutes(isCharging ? timeToCharge : timeLeft)
+            self.powerSamples.append(PowerSample(date: Date(), watts: Double(systemPower)))
+            if self.powerSamples.count > Self.maxPowerSamples {
+                self.powerSamples.removeFirst(self.powerSamples.count - Self.maxPowerSamples)
+            }
             self.onUpdate?()
         }
 
@@ -236,3 +245,10 @@ final class PowerModel: ObservableObject {
         }
     }
 }
+
+struct PowerSample: Identifiable {
+    let date: Date
+    let watts: Double
+    var id: Date { date }
+}
+
