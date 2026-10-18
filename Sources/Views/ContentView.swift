@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: PowerModel
+    @ObservedObject var alerts: BatteryAlerts
     let quitAction: () -> Void
 
     var body: some View {
@@ -61,6 +62,26 @@ struct ContentView: View {
                 ForEach(model.processes) { proc in
                     AppEnergyRow(proc: proc)
                 }
+            }
+
+            FaintDivider()
+
+            Toggle(isOn: $alerts.isEnabled) {
+                Text("Low battery alerts")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 13))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            if alerts.isEnabled {
+                HStack(spacing: 5) {
+                    ForEach(BatteryAlerts.availableThresholds, id: \.self) { level in
+                        Chip(title: "\(level)%", isOn: alerts.thresholds.contains(level)) {
+                            alerts.toggle(level)
+                        }
+                    }
+                }
+                .padding(.top, 4)
             }
 
             FaintDivider()
@@ -207,6 +228,26 @@ private struct AppEnergyRow: View {
               let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
         else { return }
         app.activate()
+    }
+}
+
+private struct Chip: View {
+    let title: String
+    let isOn: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: isOn ? .semibold : .regular))
+                .monospacedDigit()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(isOn ? Color.orange.opacity(0.85) : Color.primary.opacity(0.08)))
+                .foregroundStyle(isOn ? Color.white : Color.primary)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
 

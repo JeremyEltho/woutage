@@ -4,6 +4,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     let model = PowerModel()
+    let alerts = BatteryAlerts()
     var popover: NSPopover!
 
     private var baseIcon: NSImage?
@@ -45,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         startIconAnimation()
 
-        let hosting = NSHostingController(rootView: ContentView(model: model, quitAction: { [weak self] in
+        let hosting = NSHostingController(rootView: ContentView(model: model, alerts: alerts, quitAction: { [weak self] in
             self?.quit()
         }))
         // Without this the popover keeps a stale content size and clips the panel
@@ -66,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .iconOnly: title = ""
             }
             self.statusItem.button?.title = title
+            self.alerts.check(level: self.model.level, acConnected: self.model.acConnected)
         }
         model.start()
     }
