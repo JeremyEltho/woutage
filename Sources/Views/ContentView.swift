@@ -7,7 +7,31 @@ struct ContentView: View {
     @ObservedObject var launchAtLogin: LaunchAtLogin
     let quitAction: () -> Void
 
+    @State private var contentHeight: CGFloat = 600
+    @State private var showSettings = false
+
+    /// Tallest the panel may get: the screen's usable height (below the menu
+    /// bar) minus room for the popover arrow. Anything taller scrolls instead
+    /// of pushing the top of the panel off screen.
+    private var maxPanelHeight: CGFloat {
+        (NSScreen.main?.visibleFrame.height ?? 800) - 24
+    }
+
     var body: some View {
+        ScrollView(.vertical) {
+            panelContent
+                .background(GeometryReader { geo in
+                    Color.clear.preference(key: ContentHeightKey.self, value: geo.size.height)
+                })
+        }
+        .scrollIndicators(contentHeight > maxPanelHeight ? .automatic : .never)
+        .scrollBounceBehavior(.basedOnSize)
+        .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
+        .frame(width: 300, height: min(contentHeight, maxPanelHeight))
+        .modifier(PanelGlassBackground())
+    }
+
+    private var panelContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             BatteryHeader(
                 level: model.level,
@@ -73,52 +97,26 @@ struct ContentView: View {
 
             FaintDivider()
 
-            Toggle(isOn: $alerts.isEnabled) {
-                Text("Low battery alerts")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 13))
-            }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            if alerts.isEnabled {
-                HStack(spacing: 5) {
-                    ForEach(BatteryAlerts.availableThresholds, id: \.self) { level in
-                        Chip(title: "\(level)%", isOn: alerts.thresholds.contains(level)) {
-                            alerts.toggle(level)
-                        }
-                    }
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showSettings.toggle() }
+            } label: {
+                HStack {
+                    Text("Settings")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .rotationEffect(.degrees(showSettings ? 90 : 0))
                 }
-                .padding(.top, 4)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
-            FaintDivider()
-
-            Toggle(isOn: Binding(get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) })) {
-                Text("Launch at login")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 13))
-            }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            if let error = launchAtLogin.errorText {
-                Text(error)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.red)
-            }
-
-            FaintDivider()
-
-            HStack {
-                Text("Menu bar")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 13))
-                Spacer()
-                Picker("Menu bar", selection: $model.menuBarStyle) {
-                    ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+            if showSettings {
+                settings
+                    .padding(.top, 10)
             }
 
             FaintDivider()
@@ -142,7 +140,57 @@ struct ContentView: View {
         .padding(16)
         .frame(width: 300)
         .fixedSize(horizontal: false, vertical: true)
-        .modifier(PanelGlassBackground())
+    }
+
+    /// Set-and-forget options, folded away so the panel stays short.
+    private var settings: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(isOn: $alerts.isEnabled) {
+                    Text("Low battery alerts")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 13))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                if alerts.isEnabled {
+                    HStack(spacing: 5) {
+                        ForEach(BatteryAlerts.availableThresholds, id: \.self) { level in
+                            Chip(title: "\(level)%", isOn: alerts.thresholds.contains(level)) {
+                                alerts.toggle(level)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Toggle(isOn: Binding(get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) })) {
+                Text("Launch at login")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 13))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            if let error = launchAtLogin.errorText {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Text("Menu bar")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 13))
+                    .fixedSize()
+                Spacer(minLength: 8)
+                Picker("Menu bar", selection: $model.menuBarStyle) {
+                    ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+        }
     }
 
     private func formatTemperature(_ celsius: Double) -> String {
@@ -173,6 +221,13 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .keyboardShortcut("q")
         }
+    }
+}
+
+private struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
