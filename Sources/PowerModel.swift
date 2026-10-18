@@ -21,6 +21,9 @@ final class PowerModel: ObservableObject {
     @Published var chargeHistory = ChargeHistory()
     /// Rolling samples of what the whole machine draws, newest last.
     @Published var powerSamples: [PowerSample] = []
+    @Published var useFahrenheit: Bool = UserDefaults.standard.bool(forKey: "useFahrenheit") {
+        didSet { UserDefaults.standard.set(useFahrenheit, forKey: "useFahrenheit") }
+    }
 
     /// 5s refresh x 60 = the last five minutes.
     static let maxPowerSamples = 60
@@ -169,7 +172,7 @@ final class PowerModel: ObservableObject {
 
     /// Turns a coalition bundle id into something readable: a real app name when the
     /// bundle resolves, otherwise the daemon name looked up in ProcessCatalog.
-    static func label(forBundleID bundleID: String) -> (title: String, subtitle: String?, icon: NSImage) {
+    static func label(forBundleID bundleID: String) -> (title: String, subtitle: String?, icon: NSImage, isApp: Bool) {
         let genericIcon = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
             ?? NSWorkspace.shared.icon(for: .unixExecutable)
 
@@ -180,9 +183,9 @@ final class PowerModel: ObservableObject {
                     ?? bundle.infoDictionary?["CFBundleDisplayName"] as? String
                     ?? bundle.localizedInfoDictionary?[kCFBundleNameKey as String] as? String
                     ?? bundle.infoDictionary?[kCFBundleNameKey as String] as? String
-                if let name { return (name, nil, icon) }
+                if let name { return (name, nil, icon, true) }
             }
-            return (url.deletingPathExtension().lastPathComponent, nil, icon)
+            return (url.deletingPathExtension().lastPathComponent, nil, icon, true)
         }
 
         // Not an installed app — derive the daemon name from the bundle id
@@ -192,9 +195,9 @@ final class PowerModel: ObservableObject {
         let daemon = derived.split(separator: ".").first.map(String.init) ?? derived
 
         if let explanation = ProcessCatalog.description(for: daemon) {
-            return (explanation, daemon, genericIcon)
+            return (explanation, daemon, genericIcon, false)
         }
-        return (daemon, bundleID == daemon ? nil : bundleID, genericIcon)
+        return (daemon, bundleID == daemon ? nil : bundleID, genericIcon, false)
     }
 
     func fetchProcesses() {
@@ -226,7 +229,8 @@ final class PowerModel: ObservableObject {
                     icon: info.icon,
                     name: info.title,
                     subtitle: info.subtitle,
-                    value: formatter.string(from: NSNumber(value: impact)) ?? "\(Int(impact))"
+                    value: formatter.string(from: NSNumber(value: impact)) ?? "\(Int(impact))",
+                    bundleID: info.isApp ? bundleID : nil
                 ))
             }
 
