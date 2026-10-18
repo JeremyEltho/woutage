@@ -25,6 +25,14 @@ struct BatteryHeader: View {
         return "On Battery"
     }
 
+    private var detailText: String {
+        // PowerModel reports "Calculating…" until macOS has an estimate.
+        let estimating = timeText.hasPrefix("Calculating")
+        if isCharging { return estimating ? "Estimating time to full…" : "Full in \(timeText)" }
+        if acConnected { return "On AC power" }
+        return estimating ? "Estimating time left…" : "\(timeText) left"
+    }
+
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
@@ -53,7 +61,7 @@ struct BatteryHeader: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(statusText)
                     .font(.system(size: 15, weight: .semibold))
-                Text(isCharging ? "Full in \(timeText)" : acConnected ? "On AC power" : "\(timeText) left")
+                Text(detailText)
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
