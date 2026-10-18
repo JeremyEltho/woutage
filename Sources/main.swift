@@ -13,9 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Sprite frame is drawn into a canvas padded beyond the icon's own size so
     // the random jump/wiggle offsets never clip against the button's edges.
-    private let iconHeight: CGFloat = 28
-    private let maxWalk: CGFloat = 3
-    private let maxBounce: CGFloat = 4
+    private let iconHeight: CGFloat = 16
+    private let maxWalk: CGFloat = 2
+    private let maxBounce: CGFloat = 3
 
     // Random-walk animation state: the sprite eases from (fromX, fromY) to
     // (toX, toY) over a random duration, then idles for a random pause
