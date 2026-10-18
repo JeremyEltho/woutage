@@ -7,6 +7,7 @@ final class PowerModel: ObservableObject {
     @Published var level: Int = 0
     @Published var isCharging: Bool = false
     @Published var acConnected: Bool = false
+    /// What the whole Mac is drawing right now; shown in the menu bar.
     @Published var watts: Double = 0
     /// Signed: positive while discharging (the battery is a source of power),
     /// negative while charging (the battery is a destination).
@@ -31,8 +32,8 @@ final class PowerModel: ObservableObject {
         didSet { UserDefaults.standard.set(useFahrenheit, forKey: "useFahrenheit") }
     }
 
-    /// 5s refresh x 60 = the last five minutes.
-    static let maxPowerSamples = 60
+    /// 1s power refresh x 300 = the last five minutes.
+    static let maxPowerSamples = 300
 
     var onUpdate: (() -> Void)?
 
@@ -40,14 +41,55 @@ final class PowerModel: ObservableObject {
     static let energyDuration = 180
 
     private var timer: Timer?
+    private var powerTimer: Timer?
+    /// Live power sensors. Nil if the SMC can't be opened, in which case power
+    /// falls back to the (much slower) battery gas gauge readings.
+    private let smc = SMC()
     private var cachedHealthPct: Int?
     private var lastHealthFetch: Date?
 
     func start() {
         refresh()
+        refreshPower()
         timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.refresh()
         }
+        if smc != nil {
+            let powerTimer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+                self?.refreshPower()
+            }
+            // .common so it keeps ticking while the panel or a menu is open.
+            RunLoop.main.add(powerTimer, forMode: .common)
+            self.powerTimer = powerTimer
+        }
+    }
+
+    /// Live wattage from the SMC, once a second. Everything that shows power
+    /// (menu bar, live chart, distribution) reads these same values, so they
+    /// always agree.
+    ///
+    /// PSTR is what the whole Mac draws and PDTR is what arrives from the
+    /// charger. Whatever the charger doesn't cover comes out of the battery,
+    /// so battery power (positive while discharging, negative while
+    /// charging) is the difference.
+    private func refreshPower() {
+        guard let smc, let system = smc.readFloat("PSTR") else { return }
+        let external = max(smc.readFloat("PDTR") ?? 0, 0)
+        var battery = system - external
+        if abs(battery) < 0.05 { battery = 0 }
+        applyPower(system: max(system, 0), external: external < 0.05 ? 0 : external, battery: battery)
+    }
+
+    private func applyPower(system: Float, external: Float, battery: Float) {
+        systemPower = system
+        externalPower = external
+        batteryPower = battery
+        watts = Double(system)
+        powerSamples.append(PowerSample(date: Date(), watts: Double(system)))
+        if powerSamples.count > Self.maxPowerSamples {
+            powerSamples.removeFirst(powerSamples.count - Self.maxPowerSamples)
+        }
+        onUpdate?()
     }
 
     /// Battery health as macOS itself reports it in System Information. The raw IOKit
@@ -118,9 +160,6 @@ final class PowerModel: ObservableObject {
         let acConnected: Bool = regValue("ExternalConnected") ?? false
         let voltageMV: Int = regValue("Voltage") ?? 0
         let amperageMA: Int = regValue("Amperage") ?? 0
-        // Voltage x Amperage straight from the gas gauge. Verified against ioreg, and
-        // self-consistent whether charging or discharging.
-        let watts = abs(Double(voltageMV) * Double(amperageMA)) / 1_000_000.0
         // The gas gauge reports negative amperage while discharging, which is the
         // opposite of the convention used here, so flip it.
         var batteryPower = Float(-(Double(voltageMV) * Double(amperageMA)) / 1_000_000.0)
@@ -146,18 +185,14 @@ final class PowerModel: ObservableObject {
             self.level = level
             self.isCharging = isCharging
             self.acConnected = acConnected
-            self.watts = watts
-            self.batteryPower = batteryPower
-            self.externalPower = externalPower
-            self.systemPower = systemPower
             self.cycleCount = cycleCount
             self.temperatureC = temperatureC
             self.timeText = Self.formatMinutes(isCharging ? timeToCharge : timeLeft)
-            self.powerSamples.append(PowerSample(date: Date(), watts: Double(systemPower)))
-            if self.powerSamples.count > Self.maxPowerSamples {
-                self.powerSamples.removeFirst(self.powerSamples.count - Self.maxPowerSamples)
+            if self.smc == nil {
+                self.applyPower(system: systemPower, external: externalPower, battery: batteryPower)
+            } else {
+                self.onUpdate?()
             }
-            self.onUpdate?()
         }
 
         fetchHealth()
