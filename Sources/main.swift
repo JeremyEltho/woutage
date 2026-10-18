@@ -1,13 +1,14 @@
 import AppKit
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     let model = PowerModel()
     let keepAwake = KeepAwake()
     let alerts = BatteryAlerts()
     let launchAtLogin = LaunchAtLogin()
     var popover: NSPopover!
+    private var outsideClickMonitor: Any?
 
     private var baseIcon: NSImage?
     private var animationTimer: Timer?
@@ -57,6 +58,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentViewController = hosting
+        popover.delegate = self
+
+        // Closing when another app takes focus covers Cmd-Tab and clicking
+        // into other windows; the outside-click monitor below covers clicks
+        // on other menu bar items, which don't change the active app.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.closePopover()
+        }
 
         model.onUpdate = { [weak self] in
             guard let self else { return }
@@ -77,11 +88,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func togglePopover() {
         guard let button = statusItem.button else { return }
         if popover.isShown {
-            popover.performClose(nil)
+            closePopover()
         } else {
             launchAtLogin.refresh()
+            // A menu-bar-only app never comes to the front by itself, and a
+            // transient popover only auto-closes while its app is active.
+            NSApp.activate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+            button.highlight(true)
+
+            // Clicks anywhere outside the app, including other menu bar items,
+            // close the panel like a regular menu.
+            outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+                matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+            ) { [weak self] _ in
+                self?.closePopover()
+            }
         }
+    }
+
+    private func closePopover() {
+        guard popover.isShown else { return }
+        popover.performClose(nil)
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        if let monitor = outsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            outsideClickMonitor = nil
+        }
+        statusItem.button?.highlight(false)
     }
 
     @objc func quit() {
