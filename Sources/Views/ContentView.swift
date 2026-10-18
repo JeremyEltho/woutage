@@ -6,12 +6,12 @@ struct ContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            InfoRow(label: "Battery", value: "\(model.level)%", bold: true)
-                .padding(.bottom, 4)
-
-            InfoRow(label: model.isCharging ? "Time to Full" : "Time Left", value: model.timeText)
-            InfoRow(label: "Power Source", value: model.acConnected ? "AC Power" : "Battery")
-            InfoRow(label: "Status", value: model.isCharging ? "Charging" : "Discharging")
+            BatteryHeader(
+                level: model.level,
+                isCharging: model.isCharging,
+                acConnected: model.acConnected,
+                timeText: model.timeText
+            )
 
             FaintDivider()
 
