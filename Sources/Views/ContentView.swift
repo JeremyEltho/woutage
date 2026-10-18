@@ -138,7 +138,9 @@ struct ContentView: View {
             quitButton
         }
         .padding(16)
-        .frame(width: 300)
+        // Pinned leading so that if anything is ever too wide it gets cut
+        // off on the right, rather than the whole column shifting left.
+        .frame(width: 300, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -188,7 +190,6 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .fixedSize()
             }
         }
     }
@@ -346,8 +347,12 @@ private struct Chip: View {
             Text(title)
                 .font(.system(size: 11, weight: isOn ? .semibold : .regular))
                 .monospacedDigit()
-                .padding(.horizontal, 8)
+                .lineLimit(1)
+                .padding(.horizontal, 4)
                 .padding(.vertical, 3)
+                // Chips share their row's width evenly, so a row of them
+                // never pushes the panel wider than it is.
+                .frame(maxWidth: .infinity)
                 .background(Capsule().fill(isOn ? Color.orange.opacity(0.85) : Color.primary.opacity(0.08)))
                 .foregroundStyle(isOn ? Color.white : Color.primary)
                 .contentShape(Capsule())
