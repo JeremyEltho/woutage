@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var baseIcon: NSImage?
     private var animationTimer: Timer?
     private let spriteLayer = CALayer()
+    private let sweatLayer = CAShapeLayer()
     private var spriteHost: NSView?
 
     // Sprite frame is drawn into a canvas padded beyond the icon's own size so
@@ -100,18 +101,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (an "eased" hop over a short random duration) or a random idle pause
     /// at its current spot, alternating so the movement never repeats on a
     /// fixed cadence.
+    ///
+    /// How lively it is depends on the machine: it scurries harder the more
+    /// power the Mac draws, bounces high while charging, and drags itself
+    /// around half-asleep when the battery is low.
     private func scheduleNextPhase() {
         phaseStart = Date()
+        let mood = SpriteMood(model: model)
         if isMoving {
             isMoving = false
-            phaseDuration = Double.random(in: 0.15...1.4)
+            phaseDuration = Double.random(in: mood.pauseRange)
         } else {
             isMoving = true
             fromX = offsetX
             fromY = offsetY
-            toX = CGFloat.random(in: -maxWalk...maxWalk)
-            toY = CGFloat.random(in: 0...maxBounce)
-            phaseDuration = Double.random(in: 0.12...0.35)
+            toX = CGFloat.random(in: -maxWalk...maxWalk) * mood.reach
+            toY = CGFloat.random(in: mood.minBounce...1) * maxBounce * mood.reach
+            phaseDuration = Double.random(in: mood.hopRange)
         }
     }
 
@@ -141,6 +147,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         spriteLayer.bounds = CGRect(origin: .zero, size: baseIcon.size)
         spriteLayer.contentsGravity = .resizeAspect
         host.layer?.addSublayer(spriteLayer)
+
+        // A little sweat drop by the sprite's head, shown when the battery runs hot.
+        let drop = CGMutablePath()
+        drop.move(to: CGPoint(x: 1.5, y: 5))
+        drop.addCurve(to: CGPoint(x: 1.5, y: 0), control1: CGPoint(x: 1.5, y: 3.5), control2: CGPoint(x: -0.5, y: 1))
+        drop.addCurve(to: CGPoint(x: 1.5, y: 5), control1: CGPoint(x: 3.5, y: 1), control2: CGPoint(x: 1.5, y: 3.5))
+        sweatLayer.path = drop
+        sweatLayer.fillColor = NSColor.systemCyan.cgColor
+        sweatLayer.isHidden = true
+        host.layer?.addSublayer(sweatLayer)
         button.addSubview(host)
         spriteHost = host
 
@@ -185,11 +201,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let x = snap((maxWalk + offsetX) * fit)
         let y = snap(offsetY * fit)
 
+        let mood = SpriteMood(model: model)
+        let spriteSize = CGSize(width: baseIcon.size.width * fit, height: baseIcon.size.height * fit)
+
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        spriteLayer.bounds.size = CGSize(width: baseIcon.size.width * fit, height: baseIcon.size.height * fit)
+        spriteLayer.bounds.size = spriteSize
         spriteLayer.position = CGPoint(x: x, y: y)
+        spriteLayer.opacity = mood.isSleepy ? 0.65 : 1
+        sweatLayer.isHidden = !mood.isHot
+        if mood.isHot {
+            // Drip down the side of the head, then start again.
+            let t = CGFloat(Date().timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.2) / 1.2)
+            sweatLayer.position = CGPoint(x: x + spriteSize.width - 1, y: y + spriteSize.height * (0.75 - 0.4 * t))
+            sweatLayer.opacity = Float(1 - t)
+        }
         CATransaction.commit()
+    }
+}
+
+/// How the sprite should behave right now, derived from the battery state.
+private struct SpriteMood {
+    let pauseRange: ClosedRange<Double>
+    let hopRange: ClosedRange<Double>
+    /// Scales how far it wanders and how high it hops.
+    let reach: CGFloat
+    /// Lowest hop as a fraction of the max, so charging hops are always big.
+    let minBounce: CGFloat
+    let isSleepy: Bool
+    let isHot: Bool
+
+    init(model: PowerModel) {
+        isHot = (model.temperatureC ?? 0) >= 40
+        isSleepy = model.level < 20 && !model.acConnected
+
+        if isSleepy {
+            pauseRange = 1.5...4
+            hopRange = 0.5...0.9
+            reach = 0.4
+            minBounce = 0
+            return
+        }
+
+        // 0 when idle, 1 at ~30W and up: more power, busier sprite.
+        let energy = Double(min(max(model.systemPower / 30, 0), 1))
+        let maxPause = 1.6 - 1.4 * energy
+        pauseRange = (maxPause * 0.15)...maxPause
+        let maxHop = 0.4 - 0.25 * energy
+        hopRange = (maxHop * 0.5)...maxHop
+        reach = model.isCharging ? 1 : 0.6 + 0.4 * CGFloat(energy)
+        minBounce = model.isCharging ? 0.7 : 0
     }
 }
 
