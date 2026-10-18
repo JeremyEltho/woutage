@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var baseIcon: NSImage?
     private var animationTimer: Timer?
+    private let spriteLayer = CALayer()
+    private var spriteHost: NSView?
 
     // Sprite frame is drawn into a canvas padded beyond the icon's own size so
     // the random jump/wiggle offsets never clip against the button's edges.
@@ -103,42 +105,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Redraws the sprite each tick at its current random-walk offset, so it
+    /// Moves the sprite each tick to its current random-walk offset, so it
     /// reads as a tiny character idling, then hopping to an unpredictable
     /// spot, without ever leaving its fixed slot in the menu bar.
+    ///
+    /// The button gets a fixed, transparent placeholder image once, and the
+    /// sprite lives on its own layer on top. Only that layer's position
+    /// changes per tick; swapping `button.image` every frame forced the whole
+    /// status item to re-layout and redraw, which made it flicker and jitter.
     private func startIconAnimation() {
-        guard let baseIcon else { return }
+        guard let baseIcon, let button = statusItem.button else { return }
         scheduleNextPhase()
 
-        let canvasWidth = baseIcon.size.width + maxWalk * 2
-        let canvasHeight = baseIcon.size.height + maxBounce
-        let canvasSize = NSSize(width: canvasWidth, height: canvasHeight)
+        let canvasSize = NSSize(width: baseIcon.size.width + maxWalk * 2,
+                                height: baseIcon.size.height + maxBounce)
+        let placeholder = NSImage(size: canvasSize)
+        placeholder.isTemplate = false
+        button.image = placeholder
+        button.imagePosition = .imageLeft
 
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
-            guard let self, let button = self.statusItem.button else { return }
+        let host = NSView(frame: NSRect(origin: .zero, size: canvasSize))
+        host.wantsLayer = true
+        host.layer?.masksToBounds = false
+        spriteLayer.anchorPoint = .zero
+        spriteLayer.bounds = CGRect(origin: .zero, size: baseIcon.size)
+        spriteLayer.contentsGravity = .resizeAspect
+        host.layer?.addSublayer(spriteLayer)
+        button.addSubview(host)
+        spriteHost = host
 
-            var elapsed = Date().timeIntervalSince(self.phaseStart)
-            if elapsed >= self.phaseDuration {
-                self.scheduleNextPhase()
-                elapsed = 0
-            }
-
-            if self.isMoving {
-                let progress = min(elapsed / self.phaseDuration, 1)
-                let eased = progress * progress * (3 - 2 * progress) // smoothstep
-                self.offsetX = self.fromX + (self.toX - self.fromX) * CGFloat(eased)
-                self.offsetY = self.fromY + (self.toY - self.fromY) * CGFloat(eased)
-            }
-
-            let frame = NSImage(size: canvasSize)
-            frame.lockFocus()
-            baseIcon.draw(at: NSPoint(x: self.maxWalk + self.offsetX, y: self.offsetY),
-                          from: .zero, operation: .sourceOver, fraction: 1)
-            frame.unlockFocus()
-            frame.isTemplate = false
-            button.image = frame
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            self?.tickAnimation()
         }
         RunLoop.main.add(animationTimer!, forMode: .common)
+        tickAnimation()
+    }
+
+    private func tickAnimation() {
+        guard let button = statusItem.button, let host = spriteHost, let baseIcon else { return }
+
+        var elapsed = Date().timeIntervalSince(phaseStart)
+        if elapsed >= phaseDuration {
+            scheduleNextPhase()
+            elapsed = 0
+        }
+        if isMoving {
+            let progress = min(elapsed / phaseDuration, 1)
+            let eased = progress * progress * (3 - 2 * progress) // smoothstep
+            offsetX = fromX + (toX - fromX) * CGFloat(eased)
+            offsetY = fromY + (toY - fromY) * CGFloat(eased)
+        }
+
+        // Keep the overlay pinned to wherever the button draws its image
+        // (AppKit may scale it down if the canvas is taller than the bar).
+        let imageRect = button.cell?.imageRect(forBounds: button.bounds) ?? host.frame
+        if host.frame != imageRect { host.frame = imageRect }
+
+        let scale = button.window?.backingScaleFactor ?? 2
+        let fit = min(imageRect.width / (baseIcon.size.width + maxWalk * 2),
+                      imageRect.height / (baseIcon.size.height + maxBounce))
+        if spriteLayer.contentsScale != scale || spriteLayer.contents == nil {
+            spriteLayer.contentsScale = scale
+            spriteLayer.contents = baseIcon.layerContents(forContentsScale: scale)
+        }
+
+        // Snap to whole device pixels so the sprite doesn't shimmer as it
+        // passes between them.
+        func snap(_ v: CGFloat) -> CGFloat { (v * scale).rounded() / scale }
+        let x = snap((maxWalk + offsetX) * fit)
+        let y = snap(offsetY * fit)
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        spriteLayer.bounds.size = CGSize(width: baseIcon.size.width * fit, height: baseIcon.size.height * fit)
+        spriteLayer.position = CGPoint(x: x, y: y)
+        CATransaction.commit()
     }
 }
 
