@@ -68,8 +68,8 @@ struct BatteryHeader: View {
             }
             Spacer(minLength: 0)
         }
-        .onAppear { updatePulse() }
-        .onChange(of: isCharging) { updatePulse() }
+        // Runs on appear and again whenever charging starts or stops.
+        .task(id: isCharging) { updatePulse() }
     }
 
     private func updatePulse() {

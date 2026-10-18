@@ -25,7 +25,7 @@ struct ContentView: View {
                 })
         }
         .scrollIndicators(contentHeight > maxPanelHeight ? .automatic : .never)
-        .scrollBounceBehavior(.basedOnSize)
+        .modifier(NoBounceWhenFits())
         .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
         .frame(width: 300, height: min(contentHeight, maxPanelHeight))
         .modifier(PanelGlassBackground())
@@ -225,6 +225,17 @@ struct ContentView: View {
     }
 }
 
+/// Stops the panel rubber-banding when everything already fits (macOS 13.3+).
+private struct NoBounceWhenFits: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 13.3, *) {
+            content.scrollBounceBehavior(.basedOnSize)
+        } else {
+            content
+        }
+    }
+}
+
 private struct ContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -305,7 +316,11 @@ private struct AppEnergyRow: View {
         guard let bundleID = proc.bundleID,
               let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
         else { return }
-        app.activate()
+        if #available(macOS 14, *) {
+            app.activate()
+        } else {
+            app.activate(options: .activateIgnoringOtherApps)
+        }
     }
 }
 

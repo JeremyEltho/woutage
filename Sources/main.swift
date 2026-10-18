@@ -93,7 +93,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             launchAtLogin.refresh()
             // A menu-bar-only app never comes to the front by itself, and a
             // transient popover only auto-closes while its app is active.
-            NSApp.activate()
+            if #available(macOS 14, *) {
+                NSApp.activate()
+            } else {
+                NSApp.activate(ignoringOtherApps: true)
+            }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
             button.highlight(true)
