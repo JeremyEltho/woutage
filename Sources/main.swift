@@ -36,6 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         baseIcon = Self.loadMenuBarIcon(height: iconHeight)
         if let button = statusItem.button {
             button.title = "  …"
+            // Monospaced digits keep the title width fixed as the numbers
+            // change, so neighbouring menu bar items don't shuffle around.
+            button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
             button.action = #selector(togglePopover)
             button.target = self
         }
