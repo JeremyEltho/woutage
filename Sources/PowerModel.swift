@@ -21,6 +21,12 @@ final class PowerModel: ObservableObject {
     @Published var chargeHistory = ChargeHistory()
     /// Rolling samples of what the whole machine draws, newest last.
     @Published var powerSamples: [PowerSample] = []
+    @Published var menuBarStyle: MenuBarStyle = MenuBarStyle(rawValue: UserDefaults.standard.string(forKey: "menuBarStyle") ?? "") ?? .full {
+        didSet {
+            UserDefaults.standard.set(menuBarStyle.rawValue, forKey: "menuBarStyle")
+            onUpdate?()
+        }
+    }
     @Published var useFahrenheit: Bool = UserDefaults.standard.bool(forKey: "useFahrenheit") {
         didSet { UserDefaults.standard.set(useFahrenheit, forKey: "useFahrenheit") }
     }
@@ -256,3 +262,18 @@ struct PowerSample: Identifiable {
     var id: Date { date }
 }
 
+/// What the status item shows next to the sprite. Shorter styles help on
+/// notched Macs, where macOS hides menu bar items that don't fit.
+enum MenuBarStyle: String, CaseIterable, Identifiable {
+    case full, percent, watts, iconOnly
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .full: return "% + W"
+        case .percent: return "%"
+        case .watts: return "W"
+        case .iconOnly: return "Icon"
+        }
+    }
+}

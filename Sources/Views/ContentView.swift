@@ -65,6 +65,21 @@ struct ContentView: View {
 
             FaintDivider()
 
+            HStack {
+                Text("Menu bar")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 13))
+                Spacer()
+                Picker("Menu bar", selection: $model.menuBarStyle) {
+                    ForEach(MenuBarStyle.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+
+            FaintDivider()
+
             HStack(spacing: 8) {
                 ShortcutButton(title: "Battery Settings", symbol: "gearshape") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") {

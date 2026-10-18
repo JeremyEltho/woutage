@@ -57,7 +57,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onUpdate = { [weak self] in
             guard let self else { return }
             let wattsStr = String(format: "%.1fW", self.model.watts)
-            self.statusItem.button?.title = "  \(self.model.level)% · \(wattsStr)"
+            let title: String
+            switch self.model.menuBarStyle {
+            case .full: title = "  \(self.model.level)% · \(wattsStr)"
+            case .percent: title = "  \(self.model.level)%"
+            case .watts: title = "  \(wattsStr)"
+            case .iconOnly: title = ""
+            }
+            self.statusItem.button?.title = title
         }
         model.start()
     }
