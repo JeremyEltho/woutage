@@ -73,7 +73,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             case .watts: title = "  \(wattsStr)"
             case .iconOnly: title = ""
             }
-            self.statusItem.button?.title = title
+            // Setting the title, even to the same string, makes the status
+            // item re-measure itself, so skip it when nothing changed.
+            if self.statusItem.button?.title != title {
+                self.statusItem.button?.title = title
+            }
             self.alerts.check(level: self.model.level, acConnected: self.model.acConnected)
         }
         model.start()
