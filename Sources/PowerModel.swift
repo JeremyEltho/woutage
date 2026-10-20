@@ -37,6 +37,15 @@ final class PowerModel: ObservableObject {
 
     var onUpdate: (() -> Void)?
 
+    /// The energy list and charge history only appear in the panel, and both
+    /// go through the systemstats daemon, which isn't free. So they're only
+    /// fetched while someone can see them.
+    var isPanelVisible = false {
+        didSet {
+            if isPanelVisible && !oldValue { refreshPanelData() }
+        }
+    }
+
     /// Sample window for energy impact, in seconds.
     static let energyDuration = 180
 
@@ -196,8 +205,7 @@ final class PowerModel: ObservableObject {
         }
 
         fetchHealth()
-        fetchProcesses()
-        fetchChargeHistory()
+        if isPanelVisible { refreshPanelData() }
     }
 
     /// Energy impact per app, via the same private API Activity Monitor and BatFi use:
@@ -239,6 +247,11 @@ final class PowerModel: ObservableObject {
             return (explanation, daemon, genericIcon, false)
         }
         return (daemon, bundleID == daemon ? nil : bundleID, genericIcon, false)
+    }
+
+    func refreshPanelData() {
+        fetchProcesses()
+        fetchChargeHistory()
     }
 
     func fetchProcesses() {

@@ -92,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             } else {
                 NSApp.activate(ignoringOtherApps: true)
             }
+            model.isPanelVisible = true
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
             button.highlight(true)
@@ -112,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        model.isPanelVisible = false
         if let monitor = outsideClickMonitor {
             NSEvent.removeMonitor(monitor)
             outsideClickMonitor = nil
