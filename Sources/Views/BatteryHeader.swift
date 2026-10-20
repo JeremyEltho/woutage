@@ -1,14 +1,12 @@
 import SwiftUI
 
 /// The panel's hero: a ring gauge for the charge level, with the status and
-/// time estimate beside it. The ring tints by level and pulses while charging.
+/// time estimate beside it. The ring tints by level and glows while charging.
 struct BatteryHeader: View {
     let level: Int
     let isCharging: Bool
     let acConnected: Bool
     let timeText: String
-
-    @State private var pulse = false
 
     private var tint: Color {
         if isCharging || acConnected { return .green }
@@ -42,7 +40,10 @@ struct BatteryHeader: View {
                     .trim(from: 0, to: CGFloat(level) / 100)
                     .stroke(tint, style: StrokeStyle(lineWidth: 7, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .shadow(color: tint.opacity(pulse ? 0.7 : 0.2), radius: pulse ? 6 : 2)
+                    // A steady glow, not a pulsing one: a repeat-forever
+                    // animation keeps SwiftUI rendering at the display's
+                    // refresh rate even while the panel is closed.
+                    .shadow(color: tint.opacity(isCharging ? 0.6 : 0.2), radius: isCharging ? 5 : 2)
                     .animation(.spring(duration: 0.6), value: level)
                 VStack(spacing: 0) {
                     if isCharging {
@@ -67,16 +68,6 @@ struct BatteryHeader: View {
                     .monospacedDigit()
             }
             Spacer(minLength: 0)
-        }
-        // Runs on appear and again whenever charging starts or stops.
-        .task(id: isCharging) { updatePulse() }
-    }
-
-    private func updatePulse() {
-        if isCharging {
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) { pulse = true }
-        } else {
-            withAnimation(.easeOut(duration: 0.3)) { pulse = false }
         }
     }
 }
